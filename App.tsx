@@ -4,14 +4,15 @@ import FileUpload from './components/FileUpload';
 import ImageCard from './components/ImageCard';
 import { ExtractedImage, ProcessingStatus, AppMode } from './types';
 import { extractImagesFromPdf, processImageFiles, downloadAllImagesAsZip } from './utils/pdfProcessor';
-import { cleanImage, convertImageToVertical, removeTextFromImage } from './services/geminiService';
-import { Trash2, Archive, RefreshCw, AlertCircle, Sparkles, Smartphone, Eraser } from 'lucide-react';
+import { cleanImage, convertImageToVertical, removeTextFromImage, customizeTextInImage } from './services/geminiService';
+import { Trash2, Archive, RefreshCw, AlertCircle, Sparkles, Smartphone, Eraser, Type } from 'lucide-react';
 
 const App: React.FC = () => {
   const [status, setStatus] = useState<ProcessingStatus>(ProcessingStatus.IDLE);
   const [images, setImages] = useState<ExtractedImage[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<AppMode>(AppMode.CLEAN);
+  const [customInstruction, setCustomInstruction] = useState<string>("");
 
   // Reusable function to process a specific image object based on current mode
   const processImageItem = useCallback(async (image: ExtractedImage) => {
@@ -27,6 +28,8 @@ const App: React.FC = () => {
         resultUrl = await convertImageToVertical(image.originalUrl);
       } else if (mode === AppMode.REMOVE_TEXT) {
         resultUrl = await removeTextFromImage(image.originalUrl);
+      } else if (mode === AppMode.CUSTOMIZE_TEXT) {
+        resultUrl = await customizeTextInImage(image.originalUrl, customInstruction || "Maintain original fonts.");
       }
       
       setImages(prev => prev.map(img => 
@@ -37,9 +40,14 @@ const App: React.FC = () => {
         img.id === image.id ? { ...img, status: 'failed' } : img
       ));
     }
-  }, [mode]);
+  }, [mode, customInstruction]);
 
   const handleFileSelect = useCallback(async (files: File[]) => {
+    if (mode === AppMode.CUSTOMIZE_TEXT && !customInstruction.trim()) {
+      alert("Please enter text customization instructions before uploading.");
+      return;
+    }
+
     try {
       setStatus(ProcessingStatus.EXTRACTING);
       setError(null);
@@ -83,7 +91,7 @@ const App: React.FC = () => {
       setError("Failed to process the files. Please try again.");
       setStatus(ProcessingStatus.ERROR);
     }
-  }, [processImageItem]);
+  }, [processImageItem, mode, customInstruction]);
 
   const handleSingleItemRetry = useCallback((id: string) => {
     const imageToClean = images.find(img => img.id === id);
@@ -115,18 +123,20 @@ const App: React.FC = () => {
 
   const getModeDescription = () => {
     switch(mode) {
-      case AppMode.CLEAN: return "Upload NotebookLM PDFs or images. We'll automatically remove the branding and clean up the visuals.";
-      case AppMode.CONVERT: return "Upload landscape (16:9) photos. We'll convert them to vertical (9:16) format while preserving all your text.";
-      case AppMode.REMOVE_TEXT: return "Upload images with unwanted text overlays. We'll magically remove the text while keeping the background intact.";
+      case AppMode.CLEAN: return "Automatically detect and remove any logos or watermarks.";
+      case AppMode.CONVERT: return "Convert landscape (16:9) photos to vertical (9:16) while preserving text layout.";
+      case AppMode.REMOVE_TEXT: return "Remove all text from the image while preserving the background.";
+      case AppMode.CUSTOMIZE_TEXT: return "Change existing text or add new text matching the original fonts.";
       default: return "";
     }
   };
 
   const getModeTitle = () => {
     switch(mode) {
-      case AppMode.CLEAN: return "Remove Branding";
+      case AppMode.CLEAN: return "Remove Logos";
       case AppMode.CONVERT: return "Convert";
       case AppMode.REMOVE_TEXT: return "Remove Text";
+      case AppMode.CUSTOMIZE_TEXT: return "Customize Text";
       default: return "Process";
     }
   };
@@ -144,32 +154,32 @@ const App: React.FC = () => {
              </h2>
              
              {/* Mode Selector */}
-             <div className="inline-flex bg-slate-200 p-1 rounded-xl mb-10 shadow-inner flex-wrap justify-center">
+             <div className="inline-flex bg-slate-200 p-1 rounded-xl mb-6 shadow-inner flex-wrap justify-center gap-1">
                <button
                  onClick={() => setMode(AppMode.CLEAN)}
-                 className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                 className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
                    mode === AppMode.CLEAN 
                      ? 'bg-white text-indigo-600 shadow-sm' 
                      : 'text-slate-600 hover:text-slate-900'
                  }`}
                >
                  <Sparkles className="w-4 h-4" />
-                 Remove Branding
+                 Remove Logo
                </button>
                <button
                  onClick={() => setMode(AppMode.CONVERT)}
-                 className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                 className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
                    mode === AppMode.CONVERT 
                      ? 'bg-white text-indigo-600 shadow-sm' 
                      : 'text-slate-600 hover:text-slate-900'
                  }`}
                >
                  <Smartphone className="w-4 h-4" />
-                 Convert 16:9 to 9:16
+                 To Vertical
                </button>
                <button
                  onClick={() => setMode(AppMode.REMOVE_TEXT)}
-                 className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                 className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
                    mode === AppMode.REMOVE_TEXT 
                      ? 'bg-white text-indigo-600 shadow-sm' 
                      : 'text-slate-600 hover:text-slate-900'
@@ -178,11 +188,41 @@ const App: React.FC = () => {
                  <Eraser className="w-4 h-4" />
                  Remove Text
                </button>
+               <button
+                 onClick={() => setMode(AppMode.CUSTOMIZE_TEXT)}
+                 className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                   mode === AppMode.CUSTOMIZE_TEXT 
+                     ? 'bg-white text-indigo-600 shadow-sm' 
+                     : 'text-slate-600 hover:text-slate-900'
+                 }`}
+               >
+                 <Type className="w-4 h-4" />
+                 Customize Text
+               </button>
              </div>
 
-             <p className="text-lg text-slate-600 max-w-2xl mx-auto mb-10">
-               {getModeDescription()}
-             </p>
+             <div className="max-w-2xl mx-auto mb-8">
+                <p className="text-lg text-slate-600 mb-6">
+                  {getModeDescription()}
+                </p>
+
+                {/* Input for Customize Text Mode */}
+                {mode === AppMode.CUSTOMIZE_TEXT && (
+                  <div className="mb-6 animate-fade-in text-left">
+                    <label htmlFor="instruction" className="block text-sm font-medium text-slate-700 mb-2">
+                       Customization Instructions
+                    </label>
+                    <textarea
+                      id="instruction"
+                      rows={3}
+                      className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
+                      placeholder="e.g. Change '2024 Report' to '2025 Summary', or 'Translate the headline to Spanish'..."
+                      value={customInstruction}
+                      onChange={(e) => setCustomInstruction(e.target.value)}
+                    />
+                  </div>
+                )}
+             </div>
              
              <FileUpload 
                onFileSelect={handleFileSelect} 
@@ -225,6 +265,7 @@ const App: React.FC = () => {
                     {mode === AppMode.CLEAN && 'Logo removal complete.'}
                     {mode === AppMode.CONVERT && 'Format conversion complete.'}
                     {mode === AppMode.REMOVE_TEXT && 'Text removal complete.'}
+                    {mode === AppMode.CUSTOMIZE_TEXT && 'Text customization complete.'}
                  </p>
               </div>
               

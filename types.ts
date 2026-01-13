@@ -22,5 +22,6 @@ export interface GeminiConfig {
 export enum AppMode {
   CLEAN = 'CLEAN',
   CONVERT = 'CONVERT',
-  REMOVE_TEXT = 'REMOVE_TEXT'
+  REMOVE_TEXT = 'REMOVE_TEXT',
+  CUSTOMIZE_TEXT = 'CUSTOMIZE_TEXT'
 }

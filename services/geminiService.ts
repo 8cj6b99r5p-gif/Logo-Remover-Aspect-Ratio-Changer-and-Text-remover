@@ -25,7 +25,7 @@ export const cleanImage = async (base64Image: string): Promise<string> => {
             }
           },
           {
-            text: "Edit this image. Remove the text 'NotebookLM' and the logo icon associated with it. Fill in the area to seamlessly match the surrounding background. Output the result as an image."
+            text: "Edit this image. Detect and remove any logos, brand icons, watermarks, or corporate branding text found in this image. Inpaint the area where the logo was removed to seamlessly match the surrounding background pattern, texture, and lighting. Output the clean image."
           }
         ]
       }
@@ -95,6 +95,34 @@ export const removeTextFromImage = async (base64Image: string): Promise<string> 
     return extractImageFromResponse(response);
   } catch (error) {
     console.error("Gemini Text Removal Error:", error);
+    throw error;
+  }
+};
+
+export const customizeTextInImage = async (base64Image: string, instruction: string): Promise<string> => {
+  try {
+    const { base64Data, mimeType } = getBase64Data(base64Image);
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              mimeType: mimeType,
+              data: base64Data
+            }
+          },
+          {
+            text: `Edit this image. ${instruction}. When modifying or replacing text, it is CRITICAL to strictly match the original font family, weight, style, color, and size of the surrounding or replaced text. The change should look indistinguishable from the original design.`
+          }
+        ]
+      }
+    });
+
+    return extractImageFromResponse(response);
+  } catch (error) {
+    console.error("Gemini Text Customization Error:", error);
     throw error;
   }
 };
