@@ -1,0 +1,5 @@
+{
+  "name": "pdf2photo and ar resize and text remover",
+  "description": "Extract images from PDF files or upload images directly to automatically remove the NotebookLM branding using Gemini AI.",
+  "requestFramePermissions": []
+}
